@@ -34,6 +34,9 @@ button,select,input{font:inherit;color:inherit;}
 .live i{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(47,184,102,.6);animation:ping 2s infinite;}
 .live.paused i{background:var(--muted);animation:none;}
 @keyframes ping{70%{box-shadow:0 0 0 8px rgba(47,184,102,0);}100%{box-shadow:0 0 0 0 rgba(47,184,102,0);}}
+.source{margin:-6px 0 16px;font-size:14px;color:var(--muted);}
+.source strong{color:var(--ink);font-weight:600;}
+.source a{color:var(--ink);font-weight:600;}
 .dl{display:flex;gap:8px;flex-wrap:wrap;}
 .btn-sm{height:38px;border:0;border-radius:10px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;padding:0 14px;cursor:pointer;}
 .btn-sm.ghost{background:var(--surface);color:var(--ink);border:1.5px solid var(--line);}
@@ -120,6 +123,9 @@ svg{display:block;width:100%;height:auto;}
     </div>
   </header>
 
+  <!-- 데이터 출처: 어떤 페이지의 기록인지 -->
+  <p class="source" id="source"></p>
+
   <!-- 퍼널: 게임의 스트레스 게이지처럼 -->
   <section class="gauge-panel" aria-label="방문부터 완주까지">
     <div class="gauge-head">
@@ -198,14 +204,19 @@ async function rpc(fn, args){
 
 /* ----- 시작: 바로 대시보드 ----- */
 async function boot(){
-  try{ apps = await rpc('dash_apps'); }
+  try{ apps = await rpc('dash_apps_v2').catch(() => rpc('dash_apps')); }
   catch(e){ $('errLine').textContent = '콘텐츠 목록을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.'; return; }
   $('appSel').innerHTML = apps.map(a => `<option value="${esc(a.id)}">${esc(a.name)}${a.is_active ? '' : ' (기록 중단)'}</option>`).join('');
   appId = new URLSearchParams(location.search).get('app') || (apps[0] && apps[0].id) || '';
-  $('appSel').value = appId;
+  $('appSel').value = appId; showSource();
   load(true); start();
 }
-$('appSel').addEventListener('change', e => { appId = e.target.value; lastTop = ''; load(true); });
+$('appSel').addEventListener('change', e => { appId = e.target.value; lastTop = ''; showSource(); load(true); });
+function showSource(){                                   // 이 대시보드가 보여주는 건 '게임 페이지'의 기록 (admin.html 접속은 기록 안 함)
+  const a = apps.find(x => x.id === appId) || {};
+  const page = a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.url.replace(/^https?:\/\//,''))}index.html</a>` : '<strong>게임 페이지</strong>';
+  $('source').innerHTML = `<strong>${esc(a.name || '')}</strong> 게임 페이지(${page})에 들어온 사람들의 기록입니다. 이 대시보드 페이지를 여는 것은 기록되지 않습니다.`;
+}
 document.querySelectorAll('.period button').forEach(b => b.addEventListener('click', () => {
   period = b.dataset.p;
   document.querySelectorAll('.period button').forEach(x => x.setAttribute('aria-pressed', String(x===b)));
