@@ -520,6 +520,41 @@ const CFG = { tapGauge:1.6, swingGauge:4.5 };
 
 /* ===================== 유틸 ===================== */
 const $ = id => document.getElementById(id);
+
+/* ===================== 접속·행동 기록 (Supabase · Interactive Contents 프로젝트 공용 구조) =====================
+   모든 HTML 콘텐츠가 같은 app_events 테이블에 기록, APP_ID로 구분. 이름·이유·사진 등 개인 입력값은 보내지 않음.
+   기록 실패는 게임에 영향 없음(무시). */
+const TRACK = {
+  url: 'https://lczaikqjxiyytkfseulu.supabase.co',
+  key: 'sb_publishable_9Ld-JAJJDJmA4PhuledoaA_vhzXbftD',   // 공개용 키 (log_event 호출만 가능)
+  app: 'stress-game'
+};
+const TRACK_SID = (() => {                              // 탭마다 무작위 세션 ID (같은 사람의 반복 플레이 묶기용)
+  const mk = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+  try{ let v = sessionStorage.getItem('ic-sid'); if(!v){ v = mk(); sessionStorage.setItem('ic-sid', v); } return v; }catch(_){ return mk(); }
+})();
+const TRACK_DEVICE = /iPad|Tablet/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent)) ? 'tablet'
+  : /Mobi|Android|iPhone/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+/* 진행 단계: 이벤트를 보낼 때마다 '마지막 단계'와 그 단계에 머문 시간을 기억 → 화면을 떠날 때 leave로 전송 */
+const STEP_EVENTS = ['visit','start','door','form_name','name_done','reason_done','play_start','stage_2','stage_3','stage_4','finish_ready','finish','result','result_done'];
+let trackStep = 'visit', trackStepAt = Date.now(), leftSent = false;
+function track(event, props){
+  if(STEP_EVENTS.includes(event)){ trackStep = event; trackStepAt = Date.now(); leftSent = false; }
+  try{
+    fetch(`${TRACK.url}/rest/v1/rpc/log_event`, {
+      method:'POST', keepalive:true,
+      headers:{ apikey:TRACK.key, 'Content-Type':'application/json' },
+      body: JSON.stringify({ p_app:TRACK.app, p_event:event, p_session:TRACK_SID, p_device:TRACK_DEVICE,
+                             p_referrer:(document.referrer || '').slice(0,300), p_props:props || {} })
+    }).catch(() => {});
+  }catch(_){}
+}
+function trackLeave(){                                  // 탭 닫기·다른 앱으로 전환 시: 어느 단계에서 몇 초 머물다 떠났는지
+  if(leftSent) return; leftSent = true;
+  track('leave', { step: trackStep, sec: Math.round((Date.now() - trackStepAt)/1000) });
+}
+addEventListener('pagehide', trackLeave);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') trackLeave(); else leftSent = false; });
 const rand = (a,b) => a + Math.random()*(b-a);
 const pick = a => a[(Math.random()*a.length)|0];
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -839,12 +874,13 @@ function addGauge(v){
   if(ns > stageIdx){ stageIdx = ns; stageUp(ns); }
   updateUI();
   if(gauge >= 100 && !finReady){
-    setFinReady(true);
+    setFinReady(true); track('finish_ready');
     sfx.ready();
     vibrate(40);
   }
 }
 function stageUp(ns){
+  track('stage_' + (ns + 1));                          // 대상 2·3·4단계 도달
   setSlot(tSlot, TARGET.imgs[ns]); applyFace(tName, $('tPic'), TARGET.imgs[ns], tSlot);   // 사진도 단계별 모양으로
   sfx.stage();
   TARGET.stageUp[ns-1].forEach(e => debris(e, L.tx+rand(-.2,.2)*L.ts, L.ty-L.ts*.2, 1.5));
@@ -911,6 +947,7 @@ function boomBurst(){                                     // 피니시: 대상 �
 async function finish(){
   if(state!=='play') return;
   state='finish'; const g=gen;
+  track('finish');
   setFinReady(false);
 
   // 피니시: 왼쪽 프라이팬을 크게 휘둘러 대상 정중앙을 내려침 (임시 자루·손 리소스 삭제)
@@ -1045,6 +1082,7 @@ async function letterSlam(g){                              // 반성문 쾅!
 }
 
 async function koSequence(g){
+  track('result');
   state='ko';
   koStage.classList.add('reset'); KO_IDS.forEach(id => $(id).classList.remove('show'));   // 먼저 전부 숨기고(전환 없이) 화면 전환
   show('ko'); layoutKo(); void koStage.offsetWidth;
@@ -1076,6 +1114,7 @@ async function koSequence(g){
   await sleep(200); if(g!==gen) return;
   await stampSign(g); if(g!==gen) return;
   await sleep(450); if(g!==gen) return;
+  track('result_done');                                 // 수료증 완성 (도장까지)
   // ⑥ 버튼
   for(const id of ['again','saveImg','share']){ pop($(id)); await sleep(110); if(g!==gen) return; }
   resultBlob = renderResult().catch(() => null);   // 공유·저장용 이미지 미리 준비
@@ -1113,6 +1152,7 @@ const win = $('win');
 let wiping = false;
 async function startWithWipe(e){                         // 메인 → 시나리오: 누른 자리(START 또는 화면 어디든)에서 빛이 퍼짐 → 장면 전환 → 빛이 걷힘
   if(wiping || screen!=='main') return; wiping = true;
+  track('start');
   const w = $('wipe'), b = $('btnStart').getBoundingClientRect(), a = $('app').getBoundingClientRect();
   const onBtn = !e || !e.clientX || e.target.closest('#btnStart');
   const x = onBtn ? b.left - a.left + b.width/2 : e.clientX - a.left, y = onBtn ? b.top - a.top + b.height/2 : e.clientY - a.top;
@@ -1313,6 +1353,7 @@ $('cropRot').addEventListener('input', e => { if(crop) cropRotateBy(parseFloat(e
 $('cropR90').addEventListener('click', () => { if(crop) cropRotateBy(90, crop.cx, crop.cy); });
 $('cropCancel').addEventListener('click', closeCropper);
 $('cropApply').addEventListener('click', () => {
+  track('photo_apply');                                 // 사진 편집 적용 (진행 단계와 별도 행동)
   const c = crop; if(!c || !SIL.img) return;
   const N = 600, out = document.createElement('canvas'); out.width = out.height = N;
   const x = out.getContext('2d'), sr = silRect(), k = N/c.B;
@@ -1420,6 +1461,7 @@ async function openStory(skipDoor){
   clearAnims($('cut1'), $('creak'), scene);
   onionFace('IMG-14'); setPaper('name'); closeCropper();
   if(!skipDoor){                                                   // 컷1: 문 → '끼익~' + 문 소리
+    track('door');
     layoutCut1();
     await sleep(600); if(g!==gen) return;
     sfx.creak();
@@ -1442,7 +1484,7 @@ async function openStory(skipDoor){
   $('c2_paper').classList.add('show');
   await sleep(350); if(g!==gen) return;
   pop($('docOk'));
-  storyStep = 'name';
+  storyStep = 'name'; track('form_name');
 }
 function nudge(){                                        // 빈 칸으로 작성 완료 시: 신청서 입력칸을 좌우로 살짝 흔듦 (문구 없음)
   $('pbox').animate([{transform:'none'},{transform:'translateX(-6px)'},{transform:'translateX(6px)'},{transform:'translateX(-4px)'},{transform:'translateX(3px)'},{transform:'none'}],{duration:320});
@@ -1461,7 +1503,7 @@ async function docSubmit(){
       if(!n){ nudge(); nameIn.focus(); return; }
       targetName = n;
     }
-    saveFace(); nameIn.blur(); storyStep = 'busy';
+    saveFace(); nameIn.blur(); storyStep = 'busy'; track('name_done', { mode: pmodeVal });
     $('c2_paper').classList.remove('show'); $('docOk').classList.remove('show');
     await sleep(380); if(g!==gen) return;
     ['c2_b11','c2_b12','c2_pp'].forEach(id => $(id).classList.remove('show'));
@@ -1472,7 +1514,7 @@ async function docSubmit(){
     await sleep(350); if(g!==gen) return;
     pop($('docOk')); storyStep = 'reason';
   }else if(storyStep==='reason'){                                  // 2-3 → 2-4
-    targetReason = reasonIn.value.replace(/\s+/g,' ').trim().slice(0,30);
+    targetReason = reasonIn.value.replace(/\s+/g,' ').trim().slice(0,30); track('reason_done');
     reasonIn.blur(); storyStep = 'busy';
     $('c2_paper').classList.remove('show'); $('docOk').classList.remove('show');
     await sleep(380); if(g!==gen) return;
@@ -1488,13 +1530,14 @@ $('docOk').addEventListener('click', docSubmit);
 $('c2_secret').addEventListener('click', async () => {                // 2-4 → 플레이
   if(storyStep!=='secret') return;
   const g = gen; storyStep = 'done';
+  track('play_start', { mode: pmodeVal });              // 신청서 작성 완료 → 플레이 (글자만 / 사진)
   scene.animate([{filter:'brightness(1)',opacity:1},{filter:'brightness(2.5)',opacity:0}],{duration:350,fill:'forwards'});
   await sleep(340); if(g!==gen) return;
   startPlay();
 });
 scene.addEventListener('click', () => { if(storyStep==='door') openStory(true); });   // 문 장면은 탭하면 건너뛰기
 
-$('again').addEventListener('click', startPlay);
+$('again').addEventListener('click', () => { track('again'); startPlay(); });
 // 피니시 버튼: 스테이지 타격 입력과 분리
 finBtn.addEventListener('pointerdown', e => e.stopPropagation());
 finBtn.addEventListener('click', () => { if(finReady && state==='play') finish(); });
@@ -1568,6 +1611,7 @@ async function renderResult(){
   return new Promise(ok => c.toBlob(ok, 'image/png'));
 }
 async function saveResult(){
+  track('save');
   const btn = $('saveImg'); btn.disabled = true; btn.style.opacity = '.5';
   try{
     const blob = (resultBlob && await resultBlob) || await renderResult(), name = 'kungya-sangdamso.png';
@@ -1590,6 +1634,7 @@ $('saveImg').addEventListener('click', saveResult);
 /* 공유: 결과 이미지 + 문구 + 링크를 기기 공유 시트로 → 인스타그램·카카오톡 등 설치된 앱 선택 */
 let resultBlob = null;
 $('share').addEventListener('click', async () => {
+  track('share');
   const text = '월요일 스트레스, 넉다운!';
   const url = location.href;
   try{
@@ -1660,6 +1705,7 @@ stage.addEventListener('dblclick', e => e.preventDefault());
 
 updatePreview();
 if(screen!=='story') show('main');
+track('visit');
 
 })();
 </script>
