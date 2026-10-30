@@ -1690,7 +1690,7 @@ $('saveImg').addEventListener('click', saveResult);
 let resultBlob = null;
 $('share').addEventListener('click', async () => {
   track('share');
-  const text = pick(['쿵야와 함께 짱나는 스트레스, 🐶박살!', '스트레스 받을 땐 툭툭 털고일어나자']);   // 둘 중 하나 무작위
+  const text = '스트레스 받을 땐 툭툭 털고일어나자, 힘들 게 하는 사람 강냉이를';   // 공유 문구 (링크와 함께)
   const url = location.origin + location.pathname;          // 미리보기 이미지가 붙는 게임 주소
   try{
     const blob = resultBlob && await resultBlob;
