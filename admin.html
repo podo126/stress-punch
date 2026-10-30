@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>콘텐츠 현황 · 관리자</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ===== 토큰: 게임의 스트레스 게이지 색(빨강→노랑→초록)을 퍼널에 그대로 사용 ===== */
+:root{
+  --ink:#232946; --muted:#6f7590; --line:#dde0ea; --ground:#eef0f6; --surface:#ffffff;
+  --pink:#ef5b8d; --red:#f0533f; --yellow:#f2b705; --green:#2fb866;
+  --font:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;background:var(--ground);color:var(--ink);font:400 15px/1.55 var(--font);-webkit-font-smoothing:antialiased;}
+button,select,input{font:inherit;color:inherit;}
+:focus-visible{outline:3px solid var(--pink);outline-offset:2px;}
+.num{font-variant-numeric:tabular-nums;}
+[hidden]{display:none !important;}
+
+/* ===== 상단 ===== */
+#app{max-width:1180px;margin:0 auto;padding:20px 20px 48px;}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 16px;margin-bottom:20px;}
+.top h1{margin:0;font-size:20px;font-weight:700;margin-right:auto;}
+.top select{height:38px;border:1.5px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);}
+.period{display:flex;background:var(--surface);border:1.5px solid var(--line);border-radius:10px;padding:3px;}
+.period button{border:0;background:none;padding:5px 12px;border-radius:7px;cursor:pointer;color:var(--muted);font-size:14px;}
+.period button[aria-pressed="true"]{background:var(--ink);color:#fff;}
+.live{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(47,184,102,.6);animation:ping 2s infinite;}
+.live.paused i{background:var(--muted);animation:none;}
+@keyframes ping{70%{box-shadow:0 0 0 8px rgba(47,184,102,0);}100%{box-shadow:0 0 0 0 rgba(47,184,102,0);}}
+.dl{display:flex;gap:8px;flex-wrap:wrap;}
+.btn-sm{height:38px;border:0;border-radius:10px;background:var(--ink);color:#fff;font-weight:600;font-size:14px;padding:0 14px;cursor:pointer;}
+.btn-sm.ghost{background:var(--surface);color:var(--ink);border:1.5px solid var(--line);}
+.btn-sm:disabled{opacity:.55;cursor:progress;}
+
+/* ===== 퍼널 = 스트레스 게이지 ===== */
+.gauge-panel{background:var(--ink);color:#fff;border-radius:20px;padding:24px 26px 22px;margin-bottom:18px;}
+.gauge-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:18px;}
+.gauge-head .rate{font-size:clamp(40px,7vw,64px);font-weight:700;line-height:1;letter-spacing:-.02em;}
+.gauge-head .rate small{font-size:.45em;font-weight:600;margin-left:2px;}
+.gauge-head .cap{color:#c9cce0;font-size:14px;max-width:34ch;}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.step .bar{height:16px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden;}
+.step .bar b{display:block;height:100%;border-radius:9px;transition:width .6s cubic-bezier(.3,1,.4,1);}
+.step .lab{display:flex;justify-content:space-between;gap:8px;margin-top:8px;font-size:13px;color:#c9cce0;}
+.step .lab strong{color:#fff;font-size:20px;font-weight:600;}
+.step .drop{font-size:12px;color:#9ea3bf;margin-top:2px;}
+
+/* ===== 패널 ===== */
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:18px;margin-bottom:18px;}
+.grid.three{grid-template-columns:1.2fr 1fr 1.3fr;}
+.panel{background:var(--surface);border-radius:16px;padding:18px 20px;border:1px solid var(--line);min-width:0;}
+.panel h2{margin:0 0 12px;font-size:15px;font-weight:600;}
+.panel .sub{color:var(--muted);font-size:13px;font-weight:400;margin-left:6px;}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:0;margin:-4px 0 4px;}
+.kpis div{padding:4px 0;}
+.kpis span{display:block;font-size:12px;color:var(--muted);}
+.kpis strong{font-size:22px;font-weight:600;}
+svg{display:block;width:100%;height:auto;}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin-top:6px;}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+.rows{list-style:none;margin:0;padding:0;}
+.rows li{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:14px;}
+.rows li:first-child{border-top:0;}
+.rows .meter{grid-column:1/-1;height:6px;border-radius:4px;background:var(--ground);overflow:hidden;margin-top:-2px;}
+.rows .meter b{display:block;height:100%;background:var(--pink);border-radius:4px;}
+.feed{list-style:none;margin:0;padding:0;max-height:330px;overflow:auto;}
+.feed li{display:grid;grid-template-columns:62px 1fr auto;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:14px;align-items:center;}
+.feed li:first-child{border-top:0;}
+.feed time{color:var(--muted);font-size:13px;}
+.feed .who{color:var(--muted);font-size:12px;}
+.feed li.new{animation:flashNew 1.4s ease-out;}
+@keyframes flashNew{from{background:#fff1f6;}to{background:transparent;}}
+.tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600;background:var(--ground);}
+.tag.finish{background:#e3f7ea;color:#16803f;} .tag.visit{background:#eef0f6;} .tag.share,.tag.save{background:#fde7ef;color:#b32a5b;}
+.empty{color:var(--muted);font-size:14px;padding:18px 0;}
+.note{color:var(--muted);font-size:12px;margin-top:22px;}
+.err-line{color:var(--red);font-size:13px;min-height:18px;}
+
+.steps-panel{margin-bottom:18px;}
+.tbl-wrap{overflow-x:auto;}
+.steptbl{width:100%;border-collapse:collapse;font-size:14px;min-width:640px;}
+.steptbl th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);}
+.steptbl td{padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;}
+.steptbl .r{text-align:right;}
+.steptbl .ord{color:var(--muted);font-size:12px;margin-right:8px;}
+.steptbl .pbar{width:30%;min-width:120px;}
+.steptbl .pbar i{display:block;height:8px;border-radius:5px;background:linear-gradient(90deg,var(--red),var(--yellow) 55%,var(--green));}
+.steptbl tr.worst td{background:#fff1f6;}
+.steptbl tr.worst .drop{color:#b32a5b;font-weight:600;}
+.steptbl .stop b{font-weight:600;}
+@media (max-width:880px){ .grid,.grid.three{grid-template-columns:1fr;} }
+@media (max-width:560px){ .steps{grid-template-columns:repeat(2,1fr);row-gap:16px;} .kpis{grid-template-columns:repeat(2,1fr);} #app{padding:14px 12px 40px;} }
+@media (prefers-reduced-motion:reduce){ *{animation:none !important;transition:none !important;} }
+</style>
+</head>
+<body>
+
+<!-- 대시보드 -->
+<main id="app">
+  <header class="top">
+    <h1>콘텐츠 현황</h1>
+    <select id="appSel" aria-label="콘텐츠 선택"></select>
+    <div class="period" role="group" aria-label="기간">
+      <button data-p="today" aria-pressed="true">오늘</button>
+      <button data-p="7d" aria-pressed="false">7일</button>
+      <button data-p="30d" aria-pressed="false">30일</button>
+      <button data-p="all" aria-pressed="false">전체</button>
+    </div>
+    <div class="live" id="live"><i></i><span id="updated">불러오는 중</span></div>
+    <div class="dl">
+      <button class="btn-sm" id="dlApp">이 콘텐츠 전체 기간 저장</button>
+      <button class="btn-sm ghost" id="dlAll">모든 콘텐츠 저장</button>
+    </div>
+  </header>
+
+  <!-- 퍼널: 게임의 스트레스 게이지처럼 -->
+  <section class="gauge-panel" aria-label="방문부터 완주까지">
+    <div class="gauge-head">
+      <div class="rate num" id="rate">0<small>%</small></div>
+      <div class="cap">방문한 사람 중 끝장내기까지 간 비율</div>
+    </div>
+    <div class="steps" id="steps"></div>
+  </section>
+
+  <!-- 단계별 진행·이탈 -->
+  <section class="panel steps-panel">
+    <h2>단계별 진행·이탈<span class="sub">순 방문자(세션) 기준 · 가장 많이 빠지는 구간을 분홍으로 표시</span></h2>
+    <div class="tbl-wrap">
+      <table class="steptbl num">
+        <thead><tr><th>단계</th><th class="r">도달</th><th>진행</th><th class="r">방문 대비</th><th class="r">이전 단계 대비</th><th class="r" title="이 단계까지 오고 더 진행하지 않은 사람">여기서 멈춤</th><th class="r" title="이 단계에서 탭을 닫거나 다른 앱으로 나간 기록과 평균 머문 시간">나간 기록</th></tr></thead>
+        <tbody id="stepRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="grid">
+    <div class="panel">
+      <h2>날짜별 흐름<span class="sub">순 방문자 기준</span></h2>
+      <div id="daily"></div>
+      <div class="legend"><span><i style="background:#c9cde0"></i>방문</span><span><i style="background:var(--yellow)"></i>플레이</span><span><i style="background:var(--green)"></i>끝장내기</span></div>
+    </div>
+    <div class="panel">
+      <h2>반응</h2>
+      <div class="kpis num" id="kpis"></div>
+      <h2 style="margin-top:14px">기기</h2>
+      <ul class="rows" id="devices"></ul>
+      <h2 style="margin-top:14px">입력 방식</h2>
+      <ul class="rows" id="modes"></ul>
+    </div>
+  </section>
+
+  <section class="grid three">
+    <div class="panel">
+      <h2>시간대별 방문<span class="sub">한국시간</span></h2>
+      <div id="hourly"></div>
+    </div>
+    <div class="panel">
+      <h2>유입 경로</h2>
+      <ul class="rows" id="refs"></ul>
+    </div>
+    <div class="panel">
+      <h2>방금 일어난 일<span class="sub">15초마다 갱신</span></h2>
+      <ul class="feed" id="feed"></ul>
+    </div>
+  </section>
+
+  <p class="note">팀 내부 공유용 페이지입니다. 이름·이유·사진 등 사용자가 입력한 내용은 수집하지 않으며, 세션은 브라우저 탭 단위로 구분합니다. 저장 파일은 엑셀에서 바로 열 수 있는 CSV입니다.</p>
+  <p class="err-line" id="errLine" role="alert"></p>
+</main>
+
+<script>
+(() => {
+'use strict';
+/* ===== 설정: 팀 공유용 (로그인 없음). 공개용 키로 집계·내보내기 함수만 호출 ===== */
+const SUPABASE_URL = 'https://lczaikqjxiyytkfseulu.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_9Ld-JAJJDJmA4PhuledoaA_vhzXbftD';
+const REFRESH_MS = 15000;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n || 0).toLocaleString('ko-KR');
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let period = 'today', appId = '', apps = [], timer = 0, lastTop = '';
+
+async function rpc(fn, args){
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method:'POST', headers:{ apikey:SUPABASE_KEY, 'Content-Type':'application/json' }, body:JSON.stringify(args || {})
+  });
+  if(!r.ok) throw new Error(`${fn} ${r.status}`);
+  return r.json();
+}
+
+/* ----- 시작: 바로 대시보드 ----- */
+async function boot(){
+  try{ apps = await rpc('dash_apps'); }
+  catch(e){ $('errLine').textContent = '콘텐츠 목록을 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침하세요.'; return; }
+  $('appSel').innerHTML = apps.map(a => `<option value="${esc(a.id)}">${esc(a.name)}${a.is_active ? '' : ' (기록 중단)'}</option>`).join('');
+  appId = new URLSearchParams(location.search).get('app') || (apps[0] && apps[0].id) || '';
+  $('appSel').value = appId;
+  load(true); start();
+}
+$('appSel').addEventListener('change', e => { appId = e.target.value; lastTop = ''; load(true); });
+document.querySelectorAll('.period button').forEach(b => b.addEventListener('click', () => {
+  period = b.dataset.p;
+  document.querySelectorAll('.period button').forEach(x => x.setAttribute('aria-pressed', String(x===b)));
+  lastTop = ''; load(true);
+}));
+
+/* ----- 실시간: 15초마다, 탭이 보일 때만 ----- */
+function start(){ clearInterval(timer); timer = setInterval(() => { if(!document.hidden) load(false); }, REFRESH_MS); }
+document.addEventListener('visibilitychange', () => {
+  $('live').classList.toggle('paused', document.hidden);
+  if(!document.hidden && appId) load(false);
+});
+
+/* ----- 전체 기간 원본 기록 CSV 저장 (1,000줄씩 이어받아 개수 제한 없음) ----- */
+const EXPORT_COLS = [['id','번호'],['created_at_kst','시각(한국)'],['app_id','콘텐츠ID'],['app_name','콘텐츠'],['event','이벤트'],
+                     ['event_ko','이벤트(한글)'],['session_id','세션'],['device','기기'],['referrer','유입 주소'],['props','추가 정보']];
+async function exportCsv(onlyApp, btn){
+  const label = btn.textContent; btn.disabled = true;
+  try{
+    const rows = []; let after = 0;
+    for(;;){
+      const part = await rpc('dash_export', { p_app: onlyApp ? appId : null, p_from:null, p_to:null, p_after_id:after, p_limit:1000 });
+      rows.push(...part);
+      btn.textContent = `불러오는 중 ${fmt(rows.length)}줄`;
+      if(part.length < 1000) break;
+      after = part[part.length-1].id;
+    }
+    if(!rows.length){ $('errLine').textContent = '저장할 기록이 아직 없습니다.'; return; }
+    const cell = v => { const t = v==null ? '' : typeof v==='object' ? JSON.stringify(v) : String(v); return /[",\n\r]/.test(t) ? `"${t.replace(/"/g,'""')}"` : t; };
+    const lines = [EXPORT_COLS.map(c => c[1]).join(',')]
+      .concat(rows.map(r => EXPORT_COLS.map(([k]) => cell(k==='event_ko' ? (EV[r.event] || r.event) : k==='device' ? (DEV[r.device] || r.device || '') : r[k])).join(',')));
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type:'text/csv;charset=utf-8' });   // BOM: 엑셀 한글 깨짐 방지
+    const d = new Date(Date.now() + 9*3600e3).toISOString().slice(0,10).replace(/-/g,'');
+    const name = onlyApp ? `${appId}_전체기간_${d}.csv` : `모든콘텐츠_전체기간_${d}.csv`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    $('errLine').textContent = '';
+  }catch(e){ $('errLine').textContent = '저장하지 못했습니다. 잠시 후 다시 시도하세요.'; }
+  finally{ btn.disabled = false; btn.textContent = label; }
+}
+$('dlApp').addEventListener('click', e => exportCsv(true, e.currentTarget));
+$('dlAll').addEventListener('click', e => exportCsv(false, e.currentTarget));
+
+function range(){
+  const now = new Date(), kst = 9*3600e3;
+  const todayKst = new Date(Math.floor((now.getTime() + kst)/864e5)*864e5 - kst);   // 한국시간 오늘 0시
+  const from = period==='today' ? todayKst
+             : period==='7d'    ? new Date(todayKst.getTime() - 6*864e5)
+             : period==='30d'   ? new Date(todayKst.getTime() - 29*864e5)
+             : new Date('2026-10-01T00:00:00+09:00');
+  return { from:from.toISOString(), to:new Date(now.getTime() + 60e3).toISOString() };
+}
+
+async function load(full){
+  if(!appId) return;
+  const { from, to } = range();
+  try{
+    const data = await rpc('dash_stats', { p_app:appId, p_from:from, p_to:to });
+    render(data, full);
+    $('errLine').textContent = '';
+    $('updated').textContent = new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', second:'2-digit' }) + ' 기준';
+  }catch(e){ $('updated').textContent = '갱신 실패, 다음 주기에 다시 시도'; }
+}
+
+/* ----- 그리기 ----- */
+const EV = { visit:'접속', start:'시작', play_start:'플레이 시작', finish:'끝장내기', result:'결과 확인', save:'저장', share:'공유', again:'한 번 더' };
+const DEV = { mobile:'모바일', desktop:'PC', tablet:'태블릿', unknown:'알 수 없음' };
+const MODE = { name:'글자만', photo:'사진 + 이름', unknown:'알 수 없음' };
+function refName(host){
+  if(!host) return '직접 접속 · 링크 붙여넣기';
+  const h = host.toLowerCase();
+  if(/kakao/.test(h)) return '카카오톡';
+  if(/instagram/.test(h)) return '인스타그램';
+  if(/naver/.test(h)) return '네이버';
+  if(/google/.test(h)) return '구글';
+  if(/facebook|fb\./.test(h)) return '페이스북';
+  if(/^t\.co$|twitter|x\.com/.test(h)) return 'X(트위터)';
+  if(/github\.io/.test(h)) return '사이트 안 이동';
+  return host;
+}
+
+function render(d, full){
+  const k = d.kpi || {};
+  // 퍼널 (게이지 색: 빨강 → 노랑 → 노랑 → 초록)
+  const steps = [['방문', k.visitors, 'var(--red)'], ['시작', k.starts, '#f58a2a'], ['플레이', k.plays, 'var(--yellow)'], ['끝장내기', k.finishes, 'var(--green)']];
+  const top = Math.max(1, k.visitors || 0);
+  $('steps').innerHTML = steps.map(([lab, v, c], i) => {
+    const prev = i ? steps[i-1][1] : null, pct = Math.round((v||0)/top*100);
+    const drop = i && prev ? `이전 단계의 ${Math.round((v||0)/prev*100)}%` : i ? '이전 단계 없음' : '기준';
+    return `<div class="step"><div class="bar"><b style="width:${pct}%;background:${c}"></b></div>
+      <div class="lab"><span>${lab}</span><strong class="num">${fmt(v)}</strong></div><div class="drop">${drop}</div></div>`;
+  }).join('');
+  const rate = k.visitors ? Math.round(k.finishes / k.visitors * 1000)/10 : 0;
+  $('rate').innerHTML = `${rate}<small>%</small>`;
+
+  $('kpis').innerHTML = [['저장', k.saves], ['공유', k.shares], ['한 번 더', k.agains], ['총 접속', k.visits]]
+    .map(([l, v]) => `<div><span>${l}</span><strong>${fmt(v)}</strong></div>`).join('');
+
+  bars($('devices'), (d.devices||[]).map(x => [DEV[x.device] || x.device, x.sessions]));
+  bars($('modes'), (d.modes||[]).map(x => [MODE[x.mode] || x.mode, x.n]));
+  bars($('refs'), (d.referrers||[]).map(x => [refName(x.source), x.sessions]));
+
+  stepTable(d.steps || []);
+  $('daily').innerHTML = dailyChart(d.daily || []);
+  $('hourly').innerHTML = hourChart(d.hourly || []);
+  feed(d.recent || [], full);
+}
+
+function stepTable(rows){
+  const el = $('stepRows');
+  if(!rows.length){ el.innerHTML = '<tr><td colspan="7" class="empty">이 콘텐츠는 진행 단계가 정의되지 않았습니다.</td></tr>'; return; }
+  const base = Math.max(1, rows[0].reached);
+  let worst = -1, worstDrop = 0;                                  // 이전 단계 대비 가장 많이 빠진 구간
+  rows.forEach((r, i) => { if(i && rows[i-1].reached >= 3){ const d = 1 - r.reached/rows[i-1].reached; if(d > worstDrop){ worstDrop = d; worst = i; } } });
+  el.innerHTML = rows.map((r, i) => {
+    const prev = i ? rows[i-1].reached : null;
+    const vsPrev = i ? (prev ? Math.round(r.reached/prev*100) + '%' : '–') : '–';
+    const leftTxt = r.left ? fmt(r.left) : '–';
+    return `<tr class="${i===worst ? 'worst' : ''}">
+      <td><span class="ord">${i+1}</span>${esc(r.label)}</td>
+      <td class="r"><strong>${fmt(r.reached)}</strong></td>
+      <td class="pbar"><i style="width:${r.reached/base*100}%"></i></td>
+      <td class="r">${Math.round(r.reached/base*100)}%</td>
+      <td class="r drop">${vsPrev}</td>
+      <td class="r stop">${r.stopped ? '<b>' + fmt(r.stopped) + '</b>' : '–'}</td>
+      <td class="r">${leftTxt}</td></tr>`;
+  }).join('');
+}
+
+function bars(el, rows){
+  if(!rows.length){ el.innerHTML = '<li class="empty">아직 기록이 없습니다.</li>'; return; }
+  const max = Math.max(...rows.map(r => r[1]), 1);
+  el.innerHTML = rows.map(([l, v]) => `<li><span>${esc(l)}</span><strong class="num">${fmt(v)}</strong><div class="meter"><b style="width:${v/max*100}%"></b></div></li>`).join('');
+}
+
+function dailyChart(rows){
+  if(!rows.length) return '<p class="empty">아직 기록이 없습니다.</p>';
+  const W = 640, H = 220, pl = 34, pb = 26, pt = 10, n = rows.length;
+  const max = Math.max(1, ...rows.map(r => r.visitors));
+  const y = v => pt + (H-pt-pb)*(1 - v/max), bw = (W-pl)/n;
+  let g = '';
+  for(let t=0;t<=4;t++){ const v = Math.round(max*t/4), yy = y(v);
+    g += `<line x1="${pl}" x2="${W}" y1="${yy}" y2="${yy}" stroke="#eceef4"/><text x="${pl-6}" y="${yy+4}" text-anchor="end" font-size="11" fill="#8a8fa8">${v}</text>`; }
+  const every = Math.ceil(n/8);
+  rows.forEach((r, i) => {
+    const x = pl + i*bw, w = Math.max(2, Math.min(bw*.7, 44)), cx = x + bw/2;   // 하루만 볼 때 막대가 너무 넓어지지 않게
+    g += `<rect x="${cx-w/2}" y="${y(r.visitors)}" width="${w}" height="${H-pb-y(r.visitors)}" rx="3" fill="#c9cde0"><title>${r.day} 방문 ${r.visitors}</title></rect>`;
+    g += `<rect x="${cx-w/2}" y="${y(r.plays)}" width="${w}" height="${H-pb-y(r.plays)}" rx="3" fill="#f2b705"><title>플레이 ${r.plays}</title></rect>`;
+    g += `<rect x="${cx-w/2}" y="${y(r.finishes)}" width="${w}" height="${H-pb-y(r.finishes)}" rx="3" fill="#2fb866"><title>끝장내기 ${r.finishes}</title></rect>`;
+    if(i % every === 0) g += `<text x="${cx}" y="${H-8}" text-anchor="middle" font-size="11" fill="#8a8fa8">${r.day.slice(5).replace('-','/')}</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="날짜별 방문·플레이·끝장내기">${g}</svg>`;
+}
+
+function hourChart(rows){
+  const W = 360, H = 150, pb = 22, pt = 8, max = Math.max(1, ...rows.map(r => r.visits)), bw = W/24;
+  const nowH = new Date(Date.now() + 9*3600e3).getUTCHours();
+  let g = '';
+  rows.forEach(r => {
+    const h = (H-pb-pt)*r.visits/max, x = r.hour*bw;
+    g += `<rect x="${x+1}" y="${H-pb-h}" width="${bw-2}" height="${Math.max(h,1)}" rx="2" fill="${r.hour===nowH ? '#ef5b8d' : '#9aa0bd'}"><title>${r.hour}시 ${r.visits}</title></rect>`;
+    if(r.hour % 6 === 0) g += `<text x="${x+bw/2}" y="${H-6}" text-anchor="middle" font-size="11" fill="#8a8fa8">${r.hour}시</text>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="시간대별 방문 (분홍: 지금 시간)">${g}</svg>`;
+}
+
+function feed(rows, full){
+  const el = $('feed');
+  if(!rows.length){ el.innerHTML = '<li class="empty">아직 기록이 없습니다.</li>'; lastTop = ''; return; }
+  const key = r => r.at + r.event + r.session;
+  const seen = full ? null : lastTop;
+  let fresh = true;
+  el.innerHTML = rows.map(r => {
+    if(seen && key(r)===seen) fresh = false;
+    const isNew = seen && fresh;
+    const t = new Date(r.at).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit', hour12:false });
+    return `<li class="${isNew ? 'new' : ''}"><time>${t}</time><span><span class="tag ${esc(r.event)}">${esc(EV[r.event] || r.event)}</span></span>
+      <span class="who">${esc(DEV[r.device] || '')} · ${esc(r.session || '')}</span></li>`;
+  }).join('');
+  lastTop = key(rows[0]);
+}
+
+boot();
+})();
+</script>
+</body>
+</html>
