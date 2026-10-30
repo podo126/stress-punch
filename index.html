@@ -538,8 +538,12 @@ const TRACK_DEVICE = /iPad|Tablet/i.test(navigator.userAgent) || (navigator.maxT
 /* 진행 단계: 이벤트를 보낼 때마다 '마지막 단계'와 그 단계에 머문 시간을 기억 → 화면을 떠날 때 leave로 전송 */
 const STEP_EVENTS = ['visit','start','door','form_name','name_done','reason_done','play_start','stage_2','stage_3','stage_4','finish_ready','finish','result','result_done'];
 let trackStep = 'visit', trackStepAt = Date.now(), leftSent = false;
+const TRACK_PAGE = (location.pathname.split('/').pop() || 'index.html');          // 어느 페이지의 기록인지 (예: index.html)
+const TRACK_OFF = navigator.webdriver === true || !/^https?:$/.test(location.protocol); // 자동 브라우저(수집기·미리보기)·로컬 파일은 기록 안 함
 function track(event, props){
+  if(TRACK_OFF) return;
   if(STEP_EVENTS.includes(event)){ trackStep = event; trackStepAt = Date.now(); leftSent = false; }
+  props = Object.assign({ page: TRACK_PAGE, host: location.host }, props || {});
   try{
     fetch(`${TRACK.url}/rest/v1/rpc/log_event`, {
       method:'POST', keepalive:true,
